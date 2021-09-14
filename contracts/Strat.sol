@@ -1153,24 +1153,12 @@ contract StratManager is Ownable, Pausable {
 
     /**
      * @dev Initializes the base strategy.
-     * @param _keeper address to use as alternative owner.
-     * @param _strategist address where strategist fees go.
-     * @param _unirouter router to use for swaps
-     * @param _vault address of parent vault.
+     * _keeper address to use as alternative owner.
+     * _strategist address where strategist fees go.
+     * _unirouter router to use for swaps
+     * _vault address of parent vault.
      */
-    constructor(
-        address _keeper,
-        address _strategist,
-        address _unirouter,
-        address _vault
-    ) public {
-        keeper = _keeper;
-        strategist = _strategist;
-        unirouter = _unirouter;
-        vault = _vault;
-       
-    }
-
+    
     // checks that caller is either owner or keeper.
     modifier onlyManager() {
         require(msg.sender == owner() || msg.sender == keeper, "!manager");
@@ -1197,7 +1185,6 @@ contract StratManager is Ownable, Pausable {
      * @param _strategist new strategist address.
      */
     function setStrategist(address _strategist) external {
-        require(msg.sender == strategist, "!strategist");
 
         //Requiring this as there are transfer functions attached to strategist.
         //Transferring to the zero address breaks the transfer function.    
@@ -1213,6 +1200,7 @@ contract StratManager is Ownable, Pausable {
         
         //Using the zero address as the router will break the swaps.
         require(_unirouter != address(0), "Router cannot be the zero address");
+        require(unirouter == address(0), "Router already initialized");
         unirouter = _unirouter;
     }
 
@@ -1222,6 +1210,7 @@ contract StratManager is Ownable, Pausable {
      */
     function setVault(address _vault) external onlyOwner {
         require(_vault != address(0), "Vault cannot be the zero address");
+        require(vault == address(0), "Vault already initialized");
         vault = _vault;
     }
 
@@ -1253,14 +1242,15 @@ contract StrategyIrisLP is StratManager, FeeManager {
     using SafeMath for uint256;
 
     // Tokens used
-    address constant public output = address(0xdaB35042e63E93Cc8556c9bAE482E5415B5Ac4B1); // iris
-    address constant public usdc = address(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174); // usdc
+    address constant public output = 0xdaB35042e63E93Cc8556c9bAE482E5415B5Ac4B1; // iris
+    address constant public usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174; // usdc
+    address constant public wmatic = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270; // wmatic
     address public want;
     address public lpToken0;
     address public lpToken1;
 
     // Third party contracts
-    address constant public masterchef = address(0x4aA8DeF481d19564596754CD2108086Cf0bDc71B);// iris masterchef
+    address constant public masterchef = 0x4aA8DeF481d19564596754CD2108086Cf0bDc71B;// iris masterchef
     uint256 public poolId;
 
     // Routes
@@ -1278,35 +1268,26 @@ contract StrategyIrisLP is StratManager, FeeManager {
 
     constructor(
         address _want,
-        uint256 _poolId,
-        address[] memory _outputToUsdcRoute,
-        address[] memory _outputToLp0Route,
-        address[] memory _outputToLp1Route,
-        address _vault,
+        uint256 _poolId
 
-        //Quickswap: 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff
-        address _unirouter,
-        address _keeper,
-        address _strategist
+    ) public {
         
-    ) StratManager(_keeper, _strategist, _unirouter, _vault ) public {
         want = _want;
         poolId = _poolId;
 
-        require(_outputToUsdcRoute[0] == output, "toUsdc[0] != output");
-        outputToUsdcRoute = _outputToUsdcRoute;
+        lpToken0 = output;
+        lpToken1 = wmatic;
 
-        // setup lp routing
-        lpToken0 = IUniswapV2Pair(want).token0();
-        require(_outputToLp0Route[0] == output, "outputToLp0Route[0] != output");
-        require(_outputToLp0Route[_outputToLp0Route.length - 1] == lpToken0, "outputToLp0Route[last] != lpToken0");
-        outputToLp0Route = _outputToLp0Route;
-
-        lpToken1 = IUniswapV2Pair(want).token1();
-        require(_outputToLp1Route[0] == output, "outputToLp1Route[0] != output");
-        require(_outputToLp1Route[_outputToLp1Route.length - 1] == lpToken1, "outputToLp1Route[last] != lpToken1");
-        outputToLp1Route = _outputToLp1Route;
-
+        outputToUsdcRoute = new address[](2);
+        outputToUsdcRoute[0]= output;
+        outputToUsdcRoute[1]= usdc;
+        
+        outputToLp0Route = new address[](2);
+        outputToLp0Route[0]= output;
+        outputToLp0Route[1]= wmatic;// wmatic
+        
+        outputToLp1Route = new address[](1);
+        outputToLp1Route[0]= output;
         _giveAllowances();
     }
 
