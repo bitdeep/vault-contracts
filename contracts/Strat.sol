@@ -1148,7 +1148,7 @@ contract StratManager is Ownable, Pausable {
      */
     address public keeper;
     address public strategist;
-    address public unirouter;
+    address public unirouter = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff;
     address public vault;
 
     /**
