@@ -1465,7 +1465,7 @@ contract StrategyIrisLP is StratManager, FeeManager {
         return outputToLp1Route;
     }
         function getHarvestable() external view returns (uint256){
-        return IMasterChef(output).pendingIris(poolId, address(this));
+        return IMasterChef(masterchef).pendingIris(poolId, address(this));
     }
 
     receive () external payable {}
