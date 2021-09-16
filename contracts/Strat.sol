@@ -1184,7 +1184,7 @@ contract StratManager is Ownable, Pausable {
      * @dev Updates address where strategist fee earnings will go.
      * @param _strategist new strategist address.
      */
-    function setStrategist(address _strategist) external {
+    function setStrategist(address _strategist) external onlyOwner {
 
         //Requiring this as there are transfer functions attached to strategist.
         //Transferring to the zero address breaks the transfer function.    
@@ -1282,12 +1282,13 @@ contract StrategyIrisLP is StratManager, FeeManager {
         outputToUsdcRoute[0]= output;
         outputToUsdcRoute[1]= usdc;
         
-        outputToLp0Route = new address[](2);
+        outputToLp0Route = new address[](1);
         outputToLp0Route[0]= output;
-        outputToLp0Route[1]= wmatic;// wmatic
         
-        outputToLp1Route = new address[](1);
+        outputToLp1Route = new address[](2);
         outputToLp1Route[0]= output;
+        outputToLp1Route[1]= wmatic;
+
         _giveAllowances();
     }
 
@@ -1361,10 +1362,11 @@ contract StrategyIrisLP is StratManager, FeeManager {
         
         // Basically removed the excess transfer such as caller and beefyFeeRecipient fee  and send it to the strategist instead
         uint256 toUsdc = IERC20(output).balanceOf(address(this)).mul(STRATEGIST_FEE).div(10000);
-        IUniswapRouterETH(unirouter).swapExactTokensForETH(toUsdc, 0, outputToUsdcRoute, address(this), block.timestamp);
+        
+        IUniswapRouterETH(unirouter).swapExactTokensForTokens(toUsdc, 0, outputToUsdcRoute, address(this), block.timestamp);
  
-        uint256 nativeBal = IERC20(usdc).balanceOf(address(this));
-        IERC20(usdc).safeTransfer(strategist, nativeBal);
+        uint256 usdcBal = IERC20(usdc).balanceOf(address(this));
+        IERC20(usdc).safeTransfer(strategist, usdcBal);
     }
 
     // Adds liquidity to AMM and gets more LP tokens.
@@ -1376,7 +1378,7 @@ contract StrategyIrisLP is StratManager, FeeManager {
         }
 
         if (lpToken1 != output) {
-            IUniswapRouterETH(unirouter).swapExactTokensForTokens(outputHalf, 0, outputToLp1Route, address(this), block.timestamp);
+            IUniswapRouterETH(unirouter).swapExactTokensForETH(outputHalf, 0, outputToLp1Route, address(this), block.timestamp);
         }
 
         uint256 lp0Bal = IERC20(lpToken0).balanceOf(address(this));
@@ -1438,10 +1440,8 @@ contract StrategyIrisLP is StratManager, FeeManager {
     function _giveAllowances() internal {
         IERC20(want).safeApprove(masterchef, type(uint).max);
         IERC20(output).safeApprove(unirouter, type(uint).max);
-
         IERC20(lpToken0).safeApprove(unirouter, 0);
         IERC20(lpToken0).safeApprove(unirouter, type(uint).max);
-
         IERC20(lpToken1).safeApprove(unirouter, 0);
         IERC20(lpToken1).safeApprove(unirouter, type(uint).max);
     }
