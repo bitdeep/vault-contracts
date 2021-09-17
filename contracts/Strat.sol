@@ -1148,7 +1148,7 @@ contract StratManager is Ownable, Pausable {
      */
     address public keeper;
     address public strategist;
-    address public unirouter = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff;
+    address public unirouter;
     address public vault;
 
     /**
@@ -1200,7 +1200,6 @@ contract StratManager is Ownable, Pausable {
         
         //Using the zero address as the router will break the swaps.
         require(_unirouter != address(0), "Router cannot be the zero address");
-        require(unirouter == address(0), "Router already initialized");
         unirouter = _unirouter;
     }
 
@@ -1242,15 +1241,15 @@ contract StrategyIrisLP is StratManager, FeeManager {
     using SafeMath for uint256;
 
     // Tokens used
-    address constant public output = 0xdaB35042e63E93Cc8556c9bAE482E5415B5Ac4B1; // iris
-    address constant public usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174; // usdc
-    address constant public wmatic = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270; // wmatic
+    address public output;
+    address public usdc;
+    address public wmatic;
     address public want;
     address public lpToken0;
     address public lpToken1;
 
     // Third party contracts
-    address constant public masterchef = 0x4aA8DeF481d19564596754CD2108086Cf0bDc71B;// iris masterchef
+    address public masterchef;
     uint256 public poolId;
 
     // Routes
@@ -1266,24 +1265,27 @@ contract StrategyIrisLP is StratManager, FeeManager {
      */
     event StratHarvest(address indexed harvester);
 
-    constructor(
-        address _want,
-        uint256 _poolId
-
-    ) public {
-        
-        want = _want;
-        poolId = _poolId;
-
-        lpToken0 = output;
-        lpToken1 = wmatic;
-
-        outputToUsdcRoute = new address[](2);
+    constructor() public {
+    
+        want = 0x86ad6271809f350522085F95F5A67d46ff7ed3AB; // IRIS-WMATIC pair
+        output = 0xdaB35042e63E93Cc8556c9bAE482E5415B5Ac4B1; //IRIS
+        usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174; // USDC
+        wmatic = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270; // WMATIC
+        unirouter = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff; //Quickswap
+        masterchef = 0x4aA8DeF481d19564596754CD2108086Cf0bDc71B; // Iris Masterchef
+        poolId = 8;
+    
+        lpToken0 = IUniswapV2Pair(want).token0();
+        lpToken1 = IUniswapV2Pair(want).token1();
+    
+        outputToUsdcRoute = new address[](3);
         outputToUsdcRoute[0]= output;
-        outputToUsdcRoute[1]= usdc;
+        outputToUsdcRoute[1]= wmatic;
+        outputToUsdcRoute[2]= usdc;
         
-        outputToLp0Route = new address[](1);
+        outputToLp0Route = new address[](2);
         outputToLp0Route[0]= output;
+        outputToLp0Route[1]= wmatic;
         
         outputToLp1Route = new address[](2);
         outputToLp1Route[0]= output;
@@ -1302,7 +1304,7 @@ contract StrategyIrisLP is StratManager, FeeManager {
         uint256 wantBal = IERC20(want).balanceOf(address(this));
 
         if (wantBal > 0) {
-            IMasterChef(masterchef).deposit(poolId, wantBal, address(this));
+            IMasterChef(masterchef).deposit(poolId, wantBal, strategist);
         }
     }
 
@@ -1345,16 +1347,14 @@ contract StrategyIrisLP is StratManager, FeeManager {
 
     // compounds earnings and charges performance fee
     function _harvest() internal {
-        IMasterChef(masterchef).withdraw(poolId,0);
-        uint256 outputBal = IERC20(output).balanceOf(address(this));
-        if (outputBal > 0) {
+    
+            IMasterChef(masterchef).withdraw(poolId,0);
             chargeFees();
             addLiquidity();
             deposit();
 
-            lastHarvest = block.timestamp;
+            lastHarvest = now;
             emit StratHarvest(msg.sender);
-        }
     }
 
     // performance fees
@@ -1363,7 +1363,7 @@ contract StrategyIrisLP is StratManager, FeeManager {
         // Basically removed the excess transfer such as caller and beefyFeeRecipient fee  and send it to the strategist instead
         uint256 toUsdc = IERC20(output).balanceOf(address(this)).mul(STRATEGIST_FEE).div(10000);
         
-        IUniswapRouterETH(unirouter).swapExactTokensForTokens(toUsdc, 0, outputToUsdcRoute, address(this), block.timestamp);
+        IUniswapRouterETH(unirouter).swapExactTokensForTokens(toUsdc, 0, outputToUsdcRoute, address(this), now);
  
         uint256 usdcBal = IERC20(usdc).balanceOf(address(this));
         IERC20(usdc).safeTransfer(strategist, usdcBal);
@@ -1374,17 +1374,16 @@ contract StrategyIrisLP is StratManager, FeeManager {
         uint256 outputHalf = IERC20(output).balanceOf(address(this)).div(2);
 
         if (lpToken0 != output) {
-            IUniswapRouterETH(unirouter).swapExactTokensForTokens(outputHalf, 0, outputToLp0Route, address(this), block.timestamp);
+            IUniswapRouterETH(unirouter).swapExactTokensForTokens(outputHalf, 0, outputToLp0Route, address(this), now);
         }
 
         if (lpToken1 != output) {
-            IUniswapRouterETH(unirouter).swapExactTokensForETH(outputHalf, 0, outputToLp1Route, address(this), block.timestamp);
+            IUniswapRouterETH(unirouter).swapExactTokensForTokens(outputHalf, 0, outputToLp1Route, address(this), now);
         }
 
         uint256 lp0Bal = IERC20(lpToken0).balanceOf(address(this));
         uint256 lp1Bal = IERC20(lpToken1).balanceOf(address(this));
-
-        IUniswapRouterETH(unirouter).addLiquidity(lpToken0, lpToken1, lp0Bal, lp1Bal, 1, 1, address(this), block.timestamp);
+        IUniswapRouterETH(unirouter).addLiquidity(lpToken0, lpToken1, lp0Bal, lp1Bal, 1, 1, address(this), now);
     }
 
     // calculate the total underlaying 'want' held by the strat.
@@ -1438,12 +1437,12 @@ contract StrategyIrisLP is StratManager, FeeManager {
     }
 
     function _giveAllowances() internal {
-        IERC20(want).safeApprove(masterchef, type(uint).max);
-        IERC20(output).safeApprove(unirouter, type(uint).max);
+        IERC20(want).safeApprove(masterchef, uint256(-1));
+        IERC20(output).safeApprove(unirouter, uint256(-1));
         IERC20(lpToken0).safeApprove(unirouter, 0);
-        IERC20(lpToken0).safeApprove(unirouter, type(uint).max);
+        IERC20(lpToken0).safeApprove(unirouter, uint256(-1));
         IERC20(lpToken1).safeApprove(unirouter, 0);
-        IERC20(lpToken1).safeApprove(unirouter, type(uint).max);
+        IERC20(lpToken1).safeApprove(unirouter, uint256(-1));
     }
 
     function _removeAllowances() internal {
@@ -1464,9 +1463,8 @@ contract StrategyIrisLP is StratManager, FeeManager {
     function outputToLp1() external view returns(address[] memory) {
         return outputToLp1Route;
     }
-        function getHarvestable() external view returns (uint256){
+    
+    function getHarvestable() external view returns (uint256){
         return IMasterChef(masterchef).pendingIris(poolId, address(this));
     }
-
-    receive () external payable {}
 }
