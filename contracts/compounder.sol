@@ -1538,10 +1538,8 @@ contract autocompounder is Ownable, ReentrancyGuard {
 
     function harvestAllx2( uint _pid) external onlyOwner nonReentrant {
           IStrategy strategy = IStrategy(pid[_pid].strat);
-          uint256 _profit =strategy.getHarvestable();
-          uint256 fee =_profit.mul(strategy.keepFXS()).div(strategy.keepFXSmax());
-          poolInfo[_pid].last5MinProfit= _profit-fee;
-          poolInfo[_pid].totalProfit= poolInfo[_pid].totalProfit +(_profit - fee);
+          poolInfo[_pid].last5MinProfit= 0;
+          poolInfo[_pid].totalProfit= 0;
           
           strategy.harvest();
           poolInfo[_pid].lastTimeHarvest=block.timestamp;
