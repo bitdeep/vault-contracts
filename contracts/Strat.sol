@@ -1150,6 +1150,7 @@ contract StratManager is Ownable, Pausable {
     address public strategist;
     address public unirouter;
     address public vault;
+    address public harvester;
 
     /**
      * @dev Initializes the base strategy.
@@ -1170,6 +1171,19 @@ contract StratManager is Ownable, Pausable {
         require(msg.sender == tx.origin, "!EOA");
         _;
     }
+
+    // Modifier for harvester only functions.
+    modifier onlyHarvester() {
+        require(msg.sender == harvester, "!Harvester");
+        _;
+    }
+
+    // Function to set the contract address for the caller of the harvest function
+    function setHarvester(address _harvester) external onlyManager {
+        require(_harvester != address(0), "Harvester cannot be zero address");
+        harvester = _harvester;
+    }
+
 
     /**
      * @dev Updates address of the strat keeper.
@@ -1337,7 +1351,7 @@ contract StrategyIrisLP is StratManager, FeeManager {
         }
     }
 
-    function harvest() external virtual whenNotPaused onlyEOA {
+    function harvest() external virtual whenNotPaused onlyHarvester {
         _harvest();
     }
 
