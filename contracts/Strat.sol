@@ -1241,7 +1241,7 @@ pragma solidity ^0.6.12;
 
 abstract contract FeeManager is StratManager {
     //removed withdraw fee call fee and beefy fee
-    uint public STRATEGIST_FEE = 500;
+    uint public STRATEGIST_FEE = 75; // 0.75%
     uint constant public MAX_FEE = 600;
 
 }
